@@ -30,6 +30,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Quiz
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.WarningAmber
 import androidx.compose.material3.Button
@@ -84,6 +85,7 @@ import com.example.goetheb1worte.data.grammar.guide.GrammarExample
 import com.example.goetheb1worte.data.grammar.guide.GrammarGuideData
 import com.example.goetheb1worte.data.grammar.guide.GrammarGuideSubtopic
 import com.example.goetheb1worte.data.grammar.guide.GrammarGuideTopic
+import com.example.goetheb1worte.data.grammar.guide.GrammarReferenceRegistry
 import com.example.goetheb1worte.data.grammar.guide.GrammarTable
 import com.example.goetheb1worte.data.repository.GameType
 import com.example.goetheb1worte.localization.AppStrings
@@ -92,15 +94,17 @@ import com.example.goetheb1worte.localization.AppStrings
 @Composable
 fun GrammarGuideScreen(
     initialTopicId: String? = null,
+    initialLevel: CefrLevel? = null,
     strings: AppStrings,
     onClose: () -> Unit,
     onPracticeTopic: (GameType) -> Unit,
+    onStartInteractiveQuiz: (CefrLevel, String?) -> Unit = { _, _ -> },
     onPlayAudio: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
     var searchQuery by remember { mutableStateOf("") }
     var selectedTopicId by remember { mutableStateOf(initialTopicId) }
-    var selectedLevel by remember { mutableStateOf<CefrLevel?>(null) }
+    var selectedLevel by remember { mutableStateOf<CefrLevel?>(initialLevel) }
     val keyboardController = LocalSoftwareKeyboardController.current
 
     // Sync if initialTopicId changes externally
@@ -182,6 +186,17 @@ fun GrammarGuideScreen(
                         )
                     }
                 },
+                actions = {
+                    IconButton(onClick = {
+                        onStartInteractiveQuiz(selectedLevel ?: currentTopic?.level ?: CefrLevel.A1, currentTopic?.id)
+                    }) {
+                        Icon(
+                            imageVector = Icons.Default.Quiz,
+                            contentDescription = "Grammar Quiz",
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.surface
                 )
@@ -199,6 +214,7 @@ fun GrammarGuideScreen(
                     strings = strings,
                     onBackToList = { selectedTopicId = null },
                     onPracticeTopic = onPracticeTopic,
+                    onStartInteractiveQuiz = onStartInteractiveQuiz,
                     onPlayAudio = onPlayAudio
                 )
             } else {
@@ -391,7 +407,8 @@ fun GrammarGuideScreen(
                         showProgressionBanner = selectedLevel == null && searchQuery.isBlank(),
                         onSelectLevel = { selectedLevel = it },
                         onSelectTopic = { topic -> selectedTopicId = topic.id },
-                        onPracticeTopic = onPracticeTopic
+                        onPracticeTopic = onPracticeTopic,
+                        onStartInteractiveQuiz = onStartInteractiveQuiz
                     )
                 }
             }
@@ -406,7 +423,8 @@ private fun TopicListView(
     showProgressionBanner: Boolean,
     onSelectLevel: (CefrLevel) -> Unit,
     onSelectTopic: (GrammarGuideTopic) -> Unit,
-    onPracticeTopic: (GameType) -> Unit
+    onPracticeTopic: (GameType) -> Unit,
+    onStartInteractiveQuiz: (CefrLevel, String?) -> Unit
 ) {
     if (topics.isEmpty()) {
         Box(
@@ -443,6 +461,54 @@ private fun TopicListView(
                     strings = strings,
                     onSelectLevel = onSelectLevel
                 )
+            }
+        }
+
+        item(key = "interactive_quiz_banner") {
+            ElevatedCard(
+                onClick = { onStartInteractiveQuiz(topics.firstOrNull()?.level ?: CefrLevel.A1, null) },
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(18.dp),
+                colors = CardDefaults.elevatedCardColors(
+                    containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f)
+                ),
+                elevation = CardDefaults.elevatedCardElevation(defaultElevation = 2.dp)
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Text("🎯", fontSize = 20.sp)
+                            Text(
+                                text = "Interactive Grammar Quiz",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "Multiple Choice • Fill in the Blank • Sentence Word Ordering (A1, A2, B1)",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(8.dp))
+                    FilledTonalButton(
+                        onClick = { onStartInteractiveQuiz(topics.firstOrNull()?.level ?: CefrLevel.A1, null) },
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Text("Practice", fontWeight = FontWeight.Bold)
+                    }
+                }
             }
         }
 
@@ -719,9 +785,20 @@ private fun TopicDetailView(
     strings: AppStrings,
     onBackToList: () -> Unit,
     onPracticeTopic: (GameType) -> Unit,
+    onStartInteractiveQuiz: (CefrLevel, String?) -> Unit,
     onPlayAudio: (String) -> Unit
 ) {
     val scrollState = rememberScrollState()
+
+    val rules = remember(topic.id) {
+        topic.rules.ifEmpty { GrammarReferenceRegistry.getRulesForTopic(topic.id, topic.summary) }
+    }
+    val tips = remember(topic.id) {
+        topic.tips.ifEmpty { GrammarReferenceRegistry.getTipsForTopic(topic.id) }
+    }
+    val exceptions = remember(topic.id) {
+        topic.exceptions.ifEmpty { GrammarReferenceRegistry.getExceptionsForTopic(topic.id) }
+    }
 
     Column(
         modifier = Modifier
@@ -810,6 +887,26 @@ private fun TopicDetailView(
             }
         }
 
+        // Interactive Quiz CTA Button
+        Button(
+            onClick = { onStartInteractiveQuiz(topic.level, topic.id) },
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(14.dp)
+        ) {
+            Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(20.dp))
+            Spacer(modifier = Modifier.width(8.dp))
+            Text("Interactive Quiz: ${topic.title}", fontWeight = FontWeight.Bold)
+        }
+
+        // Rules Section Card
+        RulesCard(rules = rules)
+
+        // Tips Section Card
+        TipsCard(tips = tips)
+
+        // Exceptions Section Card
+        ExceptionsCard(exceptions = exceptions)
+
         // Subtopic Cards
         topic.subtopics.forEachIndexed { index, subtopic ->
             SubtopicCard(
@@ -849,23 +946,21 @@ private fun TopicDetailView(
                 Text(strings.allTopicsChip)
             }
 
-            if (topic.targetGameType != null) {
-                Button(
-                    onClick = { onPracticeTopic(topic.targetGameType) },
-                    modifier = Modifier.weight(1f),
-                    shape = RoundedCornerShape(14.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.PlayArrow,
-                        contentDescription = null,
-                        modifier = Modifier.size(18.dp)
-                    )
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text(
-                        text = strings.practiceTopicButton,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
+            Button(
+                onClick = { onStartInteractiveQuiz(topic.level, topic.id) },
+                modifier = Modifier.weight(1f),
+                shape = RoundedCornerShape(14.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.PlayArrow,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(modifier = Modifier.width(6.dp))
+                Text(
+                    text = "Start Quiz",
+                    fontWeight = FontWeight.Bold
+                )
             }
         }
     }
@@ -1348,6 +1443,142 @@ private fun LevelBadge(
             fontWeight = FontWeight.ExtraBold,
             color = badgeColors.fg
         )
+    }
+}
+
+@Composable
+private fun RulesCard(rules: List<String>) {
+    if (rules.isEmpty()) return
+    Card(
+        shape = RoundedCornerShape(18.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f)
+        ),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text("📜", fontSize = 20.sp)
+                Text(
+                    text = "Grammar Rules (Regeln)",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
+            rules.forEachIndexed { i, rule ->
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.Top,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        text = "${i + 1}.",
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary,
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                    Text(
+                        text = rule,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun TipsCard(tips: List<String>) {
+    if (tips.isEmpty()) return
+    Card(
+        shape = RoundedCornerShape(18.dp),
+        colors = CardDefaults.cardColors(containerColor = Color(0xFFFFF8E1)),
+        border = BorderStroke(1.dp, Color(0xFFFFD54F)),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text("💡", fontSize = 20.sp)
+                Text(
+                    text = "Study Tips & Mnemonics (Tipps)",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFFE65100)
+                )
+            }
+            tips.forEach { tip ->
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.Top,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("•", fontWeight = FontWeight.Bold, color = Color(0xFFE65100))
+                    Text(
+                        text = tip,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = Color(0xFF4E342E)
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ExceptionsCard(exceptions: List<String>) {
+    if (exceptions.isEmpty()) return
+    Card(
+        shape = RoundedCornerShape(18.dp),
+        colors = CardDefaults.cardColors(containerColor = Color(0xFFFFEBEE)),
+        border = BorderStroke(1.dp, Color(0xFFEF9A9A)),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text("⚠️", fontSize = 20.sp)
+                Text(
+                    text = "Exceptions & Irregularities (Ausnahmen)",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFFC62828)
+                )
+            }
+            exceptions.forEach { exc ->
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.Top,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("•", fontWeight = FontWeight.Bold, color = Color(0xFFC62828))
+                    Text(
+                        text = exc,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = Color(0xFF37474F)
+                    )
+                }
+            }
+        }
     }
 }
 

@@ -82,10 +82,15 @@ import com.example.goetheb1worte.presentation.quiz.dialogs.LanguageDialog
 import com.example.goetheb1worte.presentation.quiz.sheets.GameHubSheetContent
 import com.example.goetheb1worte.presentation.quiz.sheets.ProgressSheetContent
 
+import androidx.compose.material.icons.filled.Quiz
+import com.example.goetheb1worte.data.grammar.guide.CefrLevel
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun QuizScreen(
     viewModel: QuizViewModel,
+    onNavigateToGrammarGuide: (topicId: String?, level: CefrLevel?) -> Unit = { _, _ -> },
+    onNavigateToInteractiveQuiz: (level: CefrLevel, topicId: String?) -> Unit = { _, _ -> },
     modifier: Modifier = Modifier
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -150,27 +155,9 @@ fun QuizScreen(
         }
     }
 
-    CompositionLocalProvider(
-        LocalContext provides localizedContext,
-        LocalConfiguration provides localizedContext.resources.configuration,
-        LocalAppStrings provides strings
-    ) {
-        if (grammarGuideState.isVisible) {
-            GrammarGuideScreen(
-                initialTopicId = grammarGuideState.selectedTopicId,
-                strings = strings,
-                onClose = { viewModel.onEvent(QuizUiEvent.CloseGrammarGuide) },
-                onPracticeTopic = { gameType ->
-                    viewModel.onEvent(QuizUiEvent.CloseGrammarGuide)
-                    viewModel.onEvent(QuizUiEvent.SelectGameMode(gameType))
-                },
-                onPlayAudio = { sentence -> viewModel.playSentenceAudio(sentence) },
-                modifier = modifier
-            )
-        } else {
-            Scaffold(
-                contentWindowInsets = WindowInsets.safeDrawing,
-                topBar = {
+    Scaffold(
+        contentWindowInsets = WindowInsets.safeDrawing,
+        topBar = {
                     TopAppBar(
                         title = {
                             val currentGame = when (val s = uiState) {
@@ -229,8 +216,17 @@ fun QuizScreen(
                         }
                     },
                     actions = {
+                        // Interactive Grammar Quiz Button
+                        IconButton(onClick = { onNavigateToInteractiveQuiz(CefrLevel.A1, null) }) {
+                            Icon(
+                                imageVector = Icons.Default.Quiz,
+                                contentDescription = "Grammar Quiz",
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                        }
+
                         // B1 Grammar Guide Button
-                        IconButton(onClick = { viewModel.onEvent(QuizUiEvent.OpenGrammarGuide()) }) {
+                        IconButton(onClick = { onNavigateToGrammarGuide(null, null) }) {
                             Icon(
                                 imageVector = Icons.AutoMirrored.Filled.MenuBook,
                                 contentDescription = strings.grammarGuideTitle,
@@ -305,7 +301,7 @@ fun QuizScreen(
                                     viewModel.onEvent(QuizUiEvent.PlayUserRecording)
                                 }
                             },
-                            onOpenGrammarGuide = { topicId -> viewModel.onEvent(QuizUiEvent.OpenGrammarGuide(topicId)) }
+                            onOpenGrammarGuide = { topicId -> onNavigateToGrammarGuide(topicId, null) }
                         )
                     }
 
@@ -320,10 +316,8 @@ fun QuizScreen(
                     }
                 }
             }
-        }
-        }
 
-        // Language Selection Dialog
+            // Language Selection Dialog
         if (showLanguageDialog) {
             LanguageDialog(
                 currentLanguage = currentLanguage,
@@ -350,7 +344,10 @@ fun QuizScreen(
                     strings = strings,
                     onSelectCount = { count -> viewModel.onEvent(QuizUiEvent.SetQuestionCount(count)) },
                     onSelectGameMode = { mode -> viewModel.onEvent(QuizUiEvent.SelectGameMode(mode)) },
-                    onOpenGrammarGuide = { viewModel.onEvent(QuizUiEvent.OpenGrammarGuide()) }
+                    onOpenGrammarGuide = {
+                        viewModel.onEvent(QuizUiEvent.CloseGameHub)
+                        onNavigateToGrammarGuide(null, null)
+                    }
                 )
             }
         }

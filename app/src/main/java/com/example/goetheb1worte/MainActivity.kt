@@ -13,7 +13,7 @@ import com.example.goetheb1worte.audio.UserVoiceRecorder
 import com.example.goetheb1worte.data.repository.UserProgressRepositoryImpl
 import com.example.goetheb1worte.data.repository.VocabularyRepositoryImpl
 import com.example.goetheb1worte.localization.LanguageManager
-import com.example.goetheb1worte.presentation.quiz.QuizScreen
+import com.example.goetheb1worte.navigation.AppNavigation
 import com.example.goetheb1worte.presentation.quiz.QuizViewModel
 import com.example.goetheb1worte.ui.theme.GoetheB1WorteTheme
 
@@ -54,7 +54,11 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             GoetheB1WorteTheme {
-                QuizScreen(viewModel = quizViewModel)
+                AppNavigation(
+                    quizViewModel = quizViewModel,
+                    ttsManager = ttsManager,
+                    soundEffectManager = soundEffectManager
+                )
             }
         }
     }
