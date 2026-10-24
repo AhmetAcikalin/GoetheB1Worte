@@ -2,9 +2,11 @@ package com.example.goetheb1worte
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.LocalActivityResultRegistryOwner
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
+import androidx.compose.runtime.CompositionLocalProvider
 import com.example.goetheb1worte.audio.AndroidSoundEffectManager
 import com.example.goetheb1worte.audio.AndroidUserVoiceRecorder
 import com.example.goetheb1worte.audio.SoundEffectManager
@@ -53,12 +55,16 @@ class MainActivity : ComponentActivity() {
         lifecycle.addObserver(voiceRecorder)
 
         setContent {
-            GoetheB1WorteTheme {
-                AppNavigation(
-                    quizViewModel = quizViewModel,
-                    ttsManager = ttsManager,
-                    soundEffectManager = soundEffectManager
-                )
+            CompositionLocalProvider(
+                LocalActivityResultRegistryOwner provides this
+            ) {
+                GoetheB1WorteTheme {
+                    AppNavigation(
+                        quizViewModel = quizViewModel,
+                        ttsManager = ttsManager,
+                        soundEffectManager = soundEffectManager
+                    )
+                }
             }
         }
     }

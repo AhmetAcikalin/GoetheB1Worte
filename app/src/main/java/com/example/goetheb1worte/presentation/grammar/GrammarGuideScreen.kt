@@ -55,12 +55,15 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SuggestionChip
 import androidx.compose.material3.SuggestionChipDefaults
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Tab
+import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -105,12 +108,14 @@ fun GrammarGuideScreen(
     var searchQuery by remember { mutableStateOf("") }
     var selectedTopicId by remember { mutableStateOf(initialTopicId) }
     var selectedLevel by remember { mutableStateOf<CefrLevel?>(initialLevel) }
+    var currentTab by remember { mutableIntStateOf(0) } // 0 = Topics, 1 = Verb Tables
     val keyboardController = LocalSoftwareKeyboardController.current
 
     // Sync if initialTopicId changes externally
     LaunchedEffect(initialTopicId) {
         if (initialTopicId != null) {
             selectedTopicId = initialTopicId
+            currentTab = 0
             val topic = GrammarGuideData.getTopicById(initialTopicId)
             if (topic != null) {
                 selectedLevel = topic.level
@@ -122,6 +127,7 @@ fun GrammarGuideScreen(
     BackHandler {
         when {
             selectedTopicId != null -> selectedTopicId = null
+            currentTab != 0 -> currentTab = 0
             searchQuery.isNotBlank() -> searchQuery = ""
             selectedLevel != null -> selectedLevel = null
             else -> onClose()
@@ -149,6 +155,7 @@ fun GrammarGuideScreen(
                         Text(
                             text = when {
                                 currentTopic != null -> currentTopic.title
+                                currentTab == 1 -> "Verbtabellen & Rektion"
                                 selectedLevel == CefrLevel.A1 -> strings.levelA1
                                 selectedLevel == CefrLevel.A2 -> strings.levelA2
                                 selectedLevel == CefrLevel.B1 -> strings.levelB1
@@ -160,7 +167,11 @@ fun GrammarGuideScreen(
                             overflow = TextOverflow.Ellipsis
                         )
                         Text(
-                            text = if (currentTopic != null) currentTopic.subtitle else strings.grammarGuideSubtitle,
+                            text = when {
+                                currentTopic != null -> currentTopic.subtitle
+                                currentTab == 1 -> "133 unregelmäßige Verben & feste Präpositionen"
+                                else -> strings.grammarGuideSubtitle
+                            },
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.outline,
                             maxLines = 1,
@@ -172,6 +183,8 @@ fun GrammarGuideScreen(
                     IconButton(onClick = {
                         if (selectedTopicId != null) {
                             selectedTopicId = null
+                        } else if (currentTab != 0) {
+                            currentTab = 0
                         } else if (searchQuery.isNotBlank()) {
                             searchQuery = ""
                         } else if (selectedLevel != null) {
@@ -219,7 +232,35 @@ fun GrammarGuideScreen(
                 )
             } else {
                 Column(modifier = Modifier.fillMaxSize()) {
-                    // Search Bar
+                    TabRow(
+                        selectedTabIndex = currentTab,
+                        containerColor = MaterialTheme.colorScheme.surface,
+                        contentColor = MaterialTheme.colorScheme.primary
+                    ) {
+                        Tab(
+                            selected = currentTab == 0,
+                            onClick = { currentTab = 0 },
+                            text = {
+                                Text(
+                                    "Themen & Regeln",
+                                    fontWeight = if (currentTab == 0) FontWeight.Bold else FontWeight.Normal
+                                )
+                            }
+                        )
+                        Tab(
+                            selected = currentTab == 1,
+                            onClick = { currentTab = 1 },
+                            text = {
+                                Text(
+                                    "Verbtabellen",
+                                    fontWeight = if (currentTab == 1) FontWeight.Bold else FontWeight.Normal
+                                )
+                            }
+                        )
+                    }
+
+                    if (currentTab == 0) {
+                        // Search Bar
                     OutlinedTextField(
                         value = searchQuery,
                         onValueChange = {
@@ -410,7 +451,12 @@ fun GrammarGuideScreen(
                         onPracticeTopic = onPracticeTopic,
                         onStartInteractiveQuiz = onStartInteractiveQuiz
                     )
+                } else {
+                    VerbListsView(
+                        onPlayAudio = onPlayAudio
+                    )
                 }
+            }
             }
         }
     }

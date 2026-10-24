@@ -1,5 +1,7 @@
 package com.example.goetheb1worte.navigation
 
+import androidx.activity.compose.LocalActivityResultRegistryOwner
+import androidx.activity.result.ActivityResultRegistryOwner
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
@@ -51,10 +53,19 @@ fun AppNavigation(
         }
     }
 
+    val activityOwner = (context as? ActivityResultRegistryOwner)
+        ?: LocalActivityResultRegistryOwner.current
+
+    val compositionLocals = buildList {
+        add(LocalConfiguration provides localizedContext.resources.configuration)
+        add(LocalAppStrings provides strings)
+        if (activityOwner != null) {
+            add(LocalActivityResultRegistryOwner provides activityOwner)
+        }
+    }
+
     CompositionLocalProvider(
-        LocalContext provides localizedContext,
-        LocalConfiguration provides localizedContext.resources.configuration,
-        LocalAppStrings provides strings
+        *compositionLocals.toTypedArray()
     ) {
         NavDisplay(
             backStack = backStack,
